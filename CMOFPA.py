@@ -10,10 +10,9 @@ from math import pi, exp, sqrt, sin
 from copy import deepcopy
 
 class Individual():
-    def __init__(self, chrom=np.array([]), fitness=0, w=.5):
+    def __init__(self, chrom=np.array([]), fitness=0):
         self.chrom = chrom
         self.fitness = fitness
-        self.w = w
 		
 		
 class Population():
@@ -30,7 +29,7 @@ class Population():
         self.op = []    #old population
         
 class Problem():
-    def __init__(self, dimension, lb, ub, mu=10, landa=10,
+    def __init__(self, dimension, data_range, mu=10, landa=10,
                     pSwitch=.8, max_gen=10000, prob_type='ackley',
                     beta=1.5, step=0.075, search_type = 'levy'):
         
@@ -46,9 +45,7 @@ class Problem():
 #        np.random.seed(self.random_seed)
         self.lchrom = self.pop.lchrom
         self.g_star = Individual()
-        self.lb = np.array(lb)
-        self.ub = np.array(ub)
-#        self.range = data_range
+        self.range = data_range
         self.max_gen = max_gen
         
         self.mu = mu
@@ -68,87 +65,25 @@ class Problem():
         
     
     def initialize(self):
-        W = rand(self.mu)
-#        W = (np.array(range(self.mu))+1)/float(self.mu+2)
-#        W = np.ones(self.mu)*.5
         for i in range(self.mu):
-            chrom = rand(self.lchrom)*(self.ub-self.lb) - self.lb
+            chrom = rand(self.lchrom)*self.range*2 - self.range
             
-            ind = Individual()
-            ind.chrom = chrom
-            ind.w = W[i]
-            ind.fitness = self.evaluation(ind)
-            self.pop.np.append(ind)
+            fitness = self.evaluation(chrom)
+            individual = Individual(chrom, fitness)
+            self.pop.np.append(individual)
 #            print self.pop.np[len(self.pop.np)-1].chrom
 #            print self.pop.np[len(self.pop.np)-1].fitness
                 
                 
-    def evaluation(self, ind):
-        chrom = ind.chrom
-        w = ind.w
+    def evaluation(self, chrom):
         if self.prob_type=='ackley':
             sum1 = np.sum(chrom**2)
             sum2 = np.sum(np.cos(2*pi*chrom))
             n = len(chrom)
             return -20 * exp(-.2 * sqrt(sum1/n)) - exp(sum2/n) + 20 + exp(1)
-        elif self.prob_type=='ZDT1':
-            g = 1 + (9*np.sum(chrom[1:]) / float(len(chrom[1:])))
-            f1 = chrom[0]
-#            print chrom
-#            print f1
-#            print g
-            if f1>0 and g>0:
-                f2 = g * (1-(f1/g)**2)
-                
-            else:
-                f1 = 1e10
-                f2 = 0
-                
-#            u1 = w
-#            u2 = 1-w
-            
-#            w1 = u1/float(u1+u2)
-#            w2 = u2/float(u1+u2)
-            
-            return abs(w*f1 + (1-w)*f2)
+#        elif self.prob_type=='ZDT1':
+#            g = 
 
-    
-    def pareto(self):
-        X = []
-        Y = []
-        for ind in self.pop.np:
-            chrom = ind.chrom
-            g = 1 + (9*np.sum(chrom[1:]) / float(len(chrom[1:])))
-            f1 = chrom[0]
-#            print chrom
-#            print f1
-#            print g
-            if f1>0 and g>0:
-                f2 = g * (1-sqrt(f1/g))
-                
-            else:
-                f1 = 1e10
-                f2 = 0
-                
-#            u1 = normal(0, 1)
-#            u2 = normal(0, 1)
-#            
-#            w1 = u1/float(u1+u2)
-#            w2 = u2/float(u1+u2)
-            
-            X.append(f1)
-            Y.append(f2)            
-            
-#            return abs(w1*f1 + w2*f2)
-        import matplotlib.pyplot as plt
-        
-#        x = range(int(max(X)))
-#        y = [1-sqrt(i) for i in x]
-        
-        plt.scatter(Y, X)
-#        plt.scatter(y, x, marker='x')
-
-        
 
     def find_best_current(self):
         pop = [ind for ind in self.pop.np]
@@ -168,16 +103,15 @@ class Problem():
             
       
     def global_search(self, ind):
-        ind2 = deepcopy(ind)
-        
+        chrom = deepcopy(ind.chrom)
         L = self.levy()
 
-        ind2.chrom += self.step * L * (self.g_star.chrom - ind2.chrom)
+        chrom += self.step * L * (self.g_star.chrom - chrom)
         
-        fitness = self.evaluation(ind2)
+        fitness = self.evaluation(chrom)
         if fitness<ind.fitness:
             ind.fitness = fitness
-            ind.chrom = ind2.chrom
+            ind.chrom = chrom
         
     
     def local_search(self, ind):
@@ -185,13 +119,13 @@ class Problem():
         
         chrom1 = self.pop.np[int(rand()*self.mu)].chrom
         chrom2 = self.pop.np[int(rand()*self.mu)].chrom
-        ind2 = deepcopy(ind)
+        chrom = deepcopy(ind.chrom)
         
-        ind2.chrom += eps * (chrom1-chrom2)
-        fitness = self.evaluation(ind2)
+        chrom += eps * (chrom1-chrom2)
+        fitness = self.evaluation(chrom)
         if fitness<ind.fitness:
             ind.fitness = fitness
-            ind.chrom = ind2.chrom
+            ind.chrom = chrom        
 
         
 #    def search_dist(self):
@@ -200,6 +134,8 @@ class Problem():
         
 
     def levy(self):
+#        landa = float(landa)
+
         s = []
         for i in range(self.lchrom):
             up = gamma(1+self.beta) * (pi*self.beta/2.)
@@ -229,7 +165,7 @@ class Problem():
                 
     def report(self):
         f = open('out', 'a')
-        print ('%i\t%f\t%i\t%f'% (self.pop.gen, self.pop.min, self.best_gen, self.best_fitness))
+        print ('%i\t%.10f\t%i\t%.10f'% (self.pop.gen, self.pop.min, self.best_gen, self.best_fitness))
         f.write('%i\t%.10f\t%i\t%.10f\n'% (self.pop.gen, self.pop.min, self.best_gen, self.best_fitness))
         for ind in self.pop.np:
             for i in ind.chrom:
@@ -241,10 +177,10 @@ class Problem():
         f.writelines('--------------------------------\n')
            
            
-    def final_report(self, seed):
+    def final_report(self):
         f = open('report', 'a+')
         f.write('dimension\t%i\n'%prob.lchrom)
-#        f.write('data range\t(-%.3f,%.3f)\n'%(prob.range, prob.range))
+        f.write('data range\t(-%.3f,%.3f)\n'%(prob.range, prob.range))
         f.write('max gen\t\t%i\n'%prob.max_gen)
         f.write('mu\t\t\t%i\n'%prob.mu)
         f.write('landa\t\t%i\n'%prob.landa)
@@ -278,9 +214,8 @@ if __name__=='__main__':
         seed = int(random.random()*999)
 
 #        np.random.seed(seed)
-        dim = 30
-        prob = Problem(dimension=dim, lb=[0]*dim, ub=[1]*dim, max_gen=10000,
-                       mu=25, landa=35, beta=1.5, step=.1, prob_type='ZDT1')
+        prob = Problem(dimension=128, data_range=30, max_gen=100000,
+                       mu=25, landa=35)
         prob.initialize()
 #        print prob.pop.np[0].chrom
 #        prob.pop.np = prob.pop.op
@@ -312,11 +247,9 @@ if __name__=='__main__':
         print 'seed :   ', seed
     #    print '-----------------------------\n'
         
-        prob.final_report(seed)
+        prob.final_report()
                     
         best_fitness = prob.best_fitness
-    	
-        prob.pareto()
-        break
+    		
         ### 0 improvement at beginning of each epoch
         ### toole gam 0 nashe
