@@ -75,9 +75,9 @@ class Problem():
         
     
     def initialize(self):
-#        W = rand(self.mu)
+        W = rand(self.mu)
 #        W = (np.array(range(self.mu))+1)/float(self.mu+2)
-        W = np.ones(self.mu)*self.w
+#        W = np.ones(self.mu)*self.w
         for i in range(self.mu):
             chrom = rand(self.lchrom)*(self.ub-self.lb) - self.lb
             
@@ -98,25 +98,18 @@ class Problem():
             sum2 = np.sum(np.cos(2*pi*chrom))
             n = len(chrom)
             return -20 * exp(-.2 * sqrt(sum1/n)) - exp(sum2/n) + 20 + exp(1)
-        elif self.prob_type=='ZDT1':
+            
+        elif self.prob_type[:-1]=='ZDT':
             g = 1 + (9*np.sum(chrom[1:]) / float(len(chrom[1:])))
 #            g = 1
             f1 = chrom[0]
-#            print chrom
-#            print f1
-#            print g
-#            if f1>0 and g>0:
-            f2 = g * (1-sqrt(f1/g))
-                
-#            else:
-#                f1 = 1e10
-#                f2 = 0
-                
-#            u1 = w
-#            u2 = 1-w
             
-#            w1 = u1/float(u1+u2)
-#            w2 = u2/float(u1+u2)
+            if self.prob_type[-1]=='1':
+                f2 = g * (1 - sqrt(f1/g))
+            elif self.prob_type[-1]=='2':
+                f2 = g * (1 - (f1/g))**2
+            elif self.prob_type[-1]=='3':
+                f2 = g * (1 - sqrt(f1/g) - (f1/g)*sin(10*pi*f1))
             
             return w*f1 + (1-w)*f2
 
@@ -124,36 +117,36 @@ class Problem():
     def pareto(self):
         X = []
         Y = []
-        for ind in self.pop.np:
-            chrom = ind.chrom
-            g = 1 + (9*np.sum(chrom[1:]) / float(len(chrom[1:])))
-            g = 1
-            f1 = chrom[0]
-#            print chrom
-#            print f1
-#            print g
-#            if f1>0 and g>0:
-            f2 = g * (1-sqrt(f1/g))
-                
-#            else:
-#                f1 = 1e10
-#                f2 = 0
-                
-#            u1 = normal(0, 1)
-#            u2 = normal(0, 1)
-#            
-#            w1 = u1/float(u1+u2)
-#            w2 = u2/float(u1+u2)
-            
-            X.append(f1)
-            Y.append(f2)            
-            
-#            return abs(w1*f1 + w2*f2)
         
-#        x = range(int(max(X)))
-#        y = [1-sqrt(i) for i in x]
+        if self.prob_type[:-1]=='ZDT':
+            for ind in self.pop.np:
+                chrom = ind.chrom
+                g = 1 + (9*np.sum(chrom[1:]) / float(len(chrom[1:])))
+    #            g = 1
+                f1 = chrom[0]
+                
+                if self.prob_type[-1]=='1':
+                    f2 = g * (1 - sqrt(f1/g))
+                elif self.prob_type[-1]=='2':
+                    f2 = g * (1 - (f1/g))**2
+                elif self.prob_type[-1]=='3':
+                    f2 = g * (1 - sqrt(f1/g) - (f1/g)*sin(10*pi*f1))        
+
+                X.append(f1)
+                Y.append(f2)            
+                    
         
-        plt.scatter(Y, X)
+            x = [i/31. for i in range(30)]
+            if self.prob_type[-1]=='1':
+                y = [1-sqrt(i) for i in x]
+            elif self.prob_type[-1]=='2':
+                y = [(1-i)**2 for i in x]
+            elif self.prob_type[-1]=='3':
+                y = [(1-sqrt(i)-i*sin(10*pi*i))**2 for i in x]
+        
+        plt.scatter(y, x, marker='*')
+        plt.scatter(Y, X, marker='x', cmap='g')
+        
         plt.show()
 #        plt.scatter(y, x, marker='x')
 
@@ -296,15 +289,15 @@ if __name__=='__main__':
 
     pop = []    
     
-#    while best_fitness>1e-15:
-    for i in range(100):
-        print i
+    while best_fitness>1e-15:
+#    for i in range(1):
+#        print i
         seed = int(random.random()*999)
 
 #        np.random.seed(seed)
         dim = 30
-        prob = Problem(dimension=dim, lb=[0]*dim, ub=[1]*dim, max_gen=3000,
-                       mu=20, landa=35, beta=1.5, step=.1, prob_type='ZDT1',
+        prob = Problem(dimension=dim, lb=[0]*dim, ub=[1]*dim, max_gen=10000,
+                       mu=100, landa=35, beta=1.5, step=.1, prob_type='ZDT1',
                        pSwitch=.8, w=rand())
         prob.initialize()
 #        print prob.pop.np[0].chrom
@@ -312,7 +305,7 @@ if __name__=='__main__':
         prob.find_best_current()
         
         prob.gen_statistics()    
-#        prob.report()
+        prob.report()
 
 #        print prob.pop.np[0].chrom
 #        print prob.pop.np[0].fitness
@@ -324,8 +317,8 @@ if __name__=='__main__':
             prob.gen_statistics()
             prob.find_best_current()
             
-#            if prob.pop.gen%100==0:
-#                prob.report()
+            if prob.pop.gen%100==0:
+                prob.report()
             prob.pop.op = prob.pop.np
     #        print '-----------------------------'
         f.close()
@@ -343,6 +336,7 @@ if __name__=='__main__':
     	
         pop.extend([ind for ind in prob.pop.np])
 #        prob.pareto()
-#        break
+        break
+    
     prob.pop.np = [ind for ind in pop]
-    prob.pareto()        
+    prob.pareto()
