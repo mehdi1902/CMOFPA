@@ -8,6 +8,9 @@ import numpy as np
 from numpy.random import gamma, normal, rand, randint
 from math import pi, exp, sqrt, sin
 from copy import deepcopy
+import matplotlib.pyplot as plt
+plt.ioff()
+
 
 class Individual():
     def __init__(self, chrom=np.array([]), fitness=0, w=.5):
@@ -32,7 +35,7 @@ class Population():
 class Problem():
     def __init__(self, dimension, lb, ub, mu=10, landa=10,
                     pSwitch=.8, max_gen=10000, prob_type='ackley',
-                    beta=1.5, step=0.075, search_type = 'levy'):
+                    beta=1.5, step=0.075, search_type = 'levy', w=.1):
         
         '''
         sigma_type : we have 3 types of ES
@@ -43,12 +46,11 @@ class Problem():
         
         self.pop = Population(lchrom=dimension)
         
-#        np.random.seed(self.random_seed)
         self.lchrom = self.pop.lchrom
         self.g_star = Individual()
         self.lb = np.array(lb)
         self.ub = np.array(ub)
-#        self.range = data_range
+
         self.max_gen = max_gen
         
         self.mu = mu
@@ -66,11 +68,16 @@ class Problem():
         self.best_gen = 0
         self.best_chrom = Individual()
         
+        self.zeros = np.zeros(self.lchrom)
+        self.ones = np.ones(self.lchrom)
+        
+        self.w = w
+        
     
     def initialize(self):
-        W = rand(self.mu)
+#        W = rand(self.mu)
 #        W = (np.array(range(self.mu))+1)/float(self.mu+2)
-#        W = np.ones(self.mu)*.5
+        W = np.ones(self.mu)*self.w
         for i in range(self.mu):
             chrom = rand(self.lchrom)*(self.ub-self.lb) - self.lb
             
@@ -93,16 +100,17 @@ class Problem():
             return -20 * exp(-.2 * sqrt(sum1/n)) - exp(sum2/n) + 20 + exp(1)
         elif self.prob_type=='ZDT1':
             g = 1 + (9*np.sum(chrom[1:]) / float(len(chrom[1:])))
+#            g = 1
             f1 = chrom[0]
 #            print chrom
 #            print f1
 #            print g
-            if f1>0 and g>0:
-                f2 = g * (1-(f1/g)**2)
+#            if f1>0 and g>0:
+            f2 = g * (1-sqrt(f1/g))
                 
-            else:
-                f1 = 1e10
-                f2 = 0
+#            else:
+#                f1 = 1e10
+#                f2 = 0
                 
 #            u1 = w
 #            u2 = 1-w
@@ -110,7 +118,7 @@ class Problem():
 #            w1 = u1/float(u1+u2)
 #            w2 = u2/float(u1+u2)
             
-            return abs(w*f1 + (1-w)*f2)
+            return w*f1 + (1-w)*f2
 
     
     def pareto(self):
@@ -119,16 +127,17 @@ class Problem():
         for ind in self.pop.np:
             chrom = ind.chrom
             g = 1 + (9*np.sum(chrom[1:]) / float(len(chrom[1:])))
+            g = 1
             f1 = chrom[0]
 #            print chrom
 #            print f1
 #            print g
-            if f1>0 and g>0:
-                f2 = g * (1-sqrt(f1/g))
+#            if f1>0 and g>0:
+            f2 = g * (1-sqrt(f1/g))
                 
-            else:
-                f1 = 1e10
-                f2 = 0
+#            else:
+#                f1 = 1e10
+#                f2 = 0
                 
 #            u1 = normal(0, 1)
 #            u2 = normal(0, 1)
@@ -140,12 +149,12 @@ class Problem():
             Y.append(f2)            
             
 #            return abs(w1*f1 + w2*f2)
-        import matplotlib.pyplot as plt
         
 #        x = range(int(max(X)))
 #        y = [1-sqrt(i) for i in x]
         
         plt.scatter(Y, X)
+        plt.show()
 #        plt.scatter(y, x, marker='x')
 
         
@@ -173,6 +182,10 @@ class Problem():
         L = self.levy()
 
         ind2.chrom += self.step * L * (self.g_star.chrom - ind2.chrom)
+        ind2.chrom = np.max((ind2.chrom,self.zeros), axis=0)
+        ind2.chrom = np.min((ind2.chrom,self.ones), axis=0)
+        
+#        print ind2.chrom
         
         fitness = self.evaluation(ind2)
         if fitness<ind.fitness:
@@ -188,6 +201,9 @@ class Problem():
         ind2 = deepcopy(ind)
         
         ind2.chrom += eps * (chrom1-chrom2)
+        ind2.chrom = np.max((ind2.chrom,self.zeros), axis=0)
+        ind2.chrom = np.min((ind2.chrom,self.ones), axis=0)
+        
         fitness = self.evaluation(ind2)
         if fitness<ind.fitness:
             ind.fitness = fitness
@@ -268,26 +284,35 @@ class Problem():
                 
                 
 if __name__=='__main__':
-    
+    '''
+    955
+    626
+    '''
     f = open('out', 'w+')
     import random
 
     best_fitness = 10
     cnt = 0
-    while best_fitness>1e-15:
+
+    pop = []    
+    
+#    while best_fitness>1e-15:
+    for i in range(100):
+        print i
         seed = int(random.random()*999)
 
 #        np.random.seed(seed)
         dim = 30
-        prob = Problem(dimension=dim, lb=[0]*dim, ub=[1]*dim, max_gen=10000,
-                       mu=25, landa=35, beta=1.5, step=.1, prob_type='ZDT1')
+        prob = Problem(dimension=dim, lb=[0]*dim, ub=[1]*dim, max_gen=3000,
+                       mu=20, landa=35, beta=1.5, step=.1, prob_type='ZDT1',
+                       pSwitch=.8, w=rand())
         prob.initialize()
 #        print prob.pop.np[0].chrom
 #        prob.pop.np = prob.pop.op
         prob.find_best_current()
         
         prob.gen_statistics()    
-        prob.report()
+#        prob.report()
 
 #        print prob.pop.np[0].chrom
 #        print prob.pop.np[0].fitness
@@ -299,23 +324,25 @@ if __name__=='__main__':
             prob.gen_statistics()
             prob.find_best_current()
             
-            if prob.pop.gen%100==0:
-                prob.report()
+#            if prob.pop.gen%100==0:
+#                prob.report()
             prob.pop.op = prob.pop.np
     #        print '-----------------------------'
         f.close()
         
-        print 'solution :'
-        for c in prob.best_chrom:
-            print '%.15f  '%c,
-        print 'fitness :  ', prob.best_fitness
-        print 'seed :   ', seed
+#        print 'solution :'
+#        for c in prob.best_chrom:
+#            print '%.15f  '%c,
+#        print 'fitness :  ', prob.best_fitness
+#        print 'seed :   ', seed
     #    print '-----------------------------\n'
         
         prob.final_report(seed)
                     
         best_fitness = prob.best_fitness
     	
-        prob.pareto()
-        break
-    
+        pop.extend([ind for ind in prob.pop.np])
+#        prob.pareto()
+#        break
+    prob.pop.np = [ind for ind in pop]
+    prob.pareto()        
