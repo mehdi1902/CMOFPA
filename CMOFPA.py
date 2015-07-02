@@ -112,6 +112,20 @@ class Problem():
                 f2 = g * (1 - sqrt(f1/g) - (f1/g)*sin(10*pi*f1))
             
             return w*f1 + (1-w)*f2
+                
+        elif self.prob_type=='LZ':
+            x1 = chrom[0]
+            J1 = chrom[1::2]
+            J2 = chrom[2::2]
+            
+            t = np.array([sin(6*pi*x1 + j*pi/self.lchrom) for j in range(self.lchrom)])
+            t1 = t[1::2]
+            t2 = t[3::2]
+            
+            f1 = x1 + 2/float(len(J1)) * np.sum((J1-t1)**2)
+            f2 = 1 - sqrt(x1) + 2/float(len(J2)) * np.sum((J2-t2)**2)
+            
+            return w*f1 + (1-w)*f2
 
     
     def pareto(self):
@@ -133,7 +147,7 @@ class Problem():
                     f2 = g * (1 - sqrt(f1/g) - (f1/g)*sin(10*pi*f1))        
 
                 X.append(f1)
-                Y.append(f2)            
+                Y.append(f2)
                     
         
             x = [i/31. for i in range(30)]
@@ -143,9 +157,27 @@ class Problem():
                 y = [(1-i)**2 for i in x]
             elif self.prob_type[-1]=='3':
                 y = [(1-sqrt(i)-i*sin(10*pi*i))**2 for i in x]
+
+        elif self.prob_type=='LZ':
+            for ind in self.pop.np:
+                chrom = ind.chrom
+                
+                x1 = chrom[0]
+                J1 = chrom[1::2]
+                J2 = chrom[2::2]
+                
+                t = np.array([sin(6*pi*x1 + j*pi/self.lchrom) for j in range(self.lchrom)])
+                t1 = t[1::2]
+                t2 = t[3::2]
+                
+                f1 = x1 + 2/float(len(J1)) * np.sum((J1-t1)**2)
+                f2 = 1 - sqrt(x1) + 2/float(len(J2)) * np.sum((J2-t2)**2)
+                
+                X.append(f1)
+                Y.append(f2)
         
-        plt.scatter(y, x, marker='*')
-        plt.scatter(Y, X, marker='x', cmap='g')
+#        plt.scatter(y, x, marker='*')
+        plt.scatter(Y, X, marker='x', cmap='r')
         
         plt.show()
 #        plt.scatter(y, x, marker='x')
@@ -176,11 +208,17 @@ class Problem():
 
         ind2.chrom += self.step * L * (self.g_star.chrom - ind2.chrom)
         
-        if self.prob_type in ['ZDT1', 'ZDT2']:
+        if self.prob_type in ['ZDT1', 'ZDT2', 'ZDT3', 'LZ']:
             ind2.chrom = np.max((ind2.chrom,self.zeros), axis=0)
             ind2.chrom = np.min((ind2.chrom,self.ones), axis=0)
-        
-#        print ind2.chrom
+        if self.prob_type=='ZDT3':
+            ones = deepcopy(self.ones)
+            ones[0] = .852
+            ind2.chrom = np.min((ind2.chrom,ones), axis=0)
+
+            
+#            ind2.chrom = np.max((ind2.chrom,zeros), axis=0)
+#            ind2.chrom = np.min((ind2.chrom,ones), axis=0)
         
         fitness = self.evaluation(ind2)
         if fitness<ind.fitness:
@@ -197,10 +235,19 @@ class Problem():
         
         ind2.chrom += eps * (chrom1-chrom2)
         
-        if self.prob_type in ['ZDT1', 'ZDT2']:
+        if self.prob_type in ['ZDT1', 'ZDT2', 'ZDT3', 'LZ']:
             ind2.chrom = np.max((ind2.chrom,self.zeros), axis=0)
             ind2.chrom = np.min((ind2.chrom,self.ones), axis=0)
-        
+        if self.prob_type=='ZDT3':
+#            zeros = deepcopy(self.zeros-.733)
+#            zeros[0] = 0
+            ones = deepcopy(self.ones)
+            ones[0] = .852
+            ind2.chrom = np.min((ind2.chrom,ones), axis=0)
+            
+#            ind2.chrom = np.max((ind2.chrom,zeros), axis=0)
+#            ind2.chrom = np.min((ind2.chrom,ones), axis=0)
+            
         fitness = self.evaluation(ind2)
         if fitness<ind.fitness:
             ind.fitness = fitness
@@ -301,7 +348,7 @@ if __name__=='__main__':
 #        np.random.seed(seed)
         dim = 30
         prob = Problem(dimension=dim, lb=[0]*dim, ub=[1]*dim, max_gen=10000,
-                       mu=100, landa=35, beta=1.5, step=.1, prob_type='ZDT1',
+                       mu=300, landa=35, beta=1.5, step=.1, prob_type='LZ',
                        pSwitch=.8, w=rand())
         prob.initialize()
 #        print prob.pop.np[0].chrom
