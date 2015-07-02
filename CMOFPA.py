@@ -175,8 +175,10 @@ class Problem():
         L = self.levy()
 
         ind2.chrom += self.step * L * (self.g_star.chrom - ind2.chrom)
-        ind2.chrom = np.max((ind2.chrom,self.zeros), axis=0)
-        ind2.chrom = np.min((ind2.chrom,self.ones), axis=0)
+        
+        if self.prob_type in ['ZDT1', 'ZDT2']:
+            ind2.chrom = np.max((ind2.chrom,self.zeros), axis=0)
+            ind2.chrom = np.min((ind2.chrom,self.ones), axis=0)
         
 #        print ind2.chrom
         
@@ -194,8 +196,10 @@ class Problem():
         ind2 = deepcopy(ind)
         
         ind2.chrom += eps * (chrom1-chrom2)
-        ind2.chrom = np.max((ind2.chrom,self.zeros), axis=0)
-        ind2.chrom = np.min((ind2.chrom,self.ones), axis=0)
+        
+        if self.prob_type in ['ZDT1', 'ZDT2']:
+            ind2.chrom = np.max((ind2.chrom,self.zeros), axis=0)
+            ind2.chrom = np.min((ind2.chrom,self.ones), axis=0)
         
         fitness = self.evaluation(ind2)
         if fitness<ind.fitness:
