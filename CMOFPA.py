@@ -325,7 +325,7 @@ class Problem():
                 
     def report(self):
         f = open('out', 'a')
-        print ('%i\t%f\t%i\t%f'% (self.pop.gen, self.pop.min, self.best_gen, self.best_fitness))
+        print ('%i\t%.4g\t%i\t%.4g'% (self.pop.gen, self.pop.min, self.best_gen, self.best_fitness))
         f.write('%i\t%.10f\t%i\t%.10f\n'% (self.pop.gen, self.pop.min, self.best_gen, self.best_fitness))
         for ind in self.pop.np:
             for i in ind.chrom:
