@@ -9,6 +9,7 @@ from numpy.random import gamma, normal, rand, randint
 from math import pi, exp, sqrt, sin
 from copy import deepcopy
 import matplotlib.pyplot as plt
+from chaos import *
 plt.ioff()
 
 
@@ -35,7 +36,9 @@ class Population():
 class Problem():
     def __init__(self, dimension, lb, ub, mu=10, landa=10,
                     pSwitch=.8, max_gen=10000, prob_type='ackley',
-                    beta=1.5, step=0.075, search_type = 'levy', w=.1):
+                    beta=1.5, step=0.075, search_type = 'levy',
+                    map_type='logistic', 
+                    chaos_init=False, chaos_local=False):
         
         '''
         sigma_type : we have 3 types of ES
@@ -71,16 +74,38 @@ class Problem():
         self.zeros = np.zeros(self.lchrom)
         self.ones = np.ones(self.lchrom)
         
-        self.w = w
+        self.map_type = map_type
+        self.map = Chaos_map(map_type)
+        self.chaos_init = chaos_init
+        self.chaos_local = chaos_local
+#        self.w = w
+        self.max = np.array([])
+#        self.chaotic_seq = self.map.logistic_map(self.max_gen*self.mu, .01, 3.6)
+        self.chaotic_seq = self.map.logistic_map(self.max_gen*self.mu, .01, 3.6)
         
+        self.L = []
     
     def initialize(self):
-        W = rand(self.mu)
+        if self.chaos_init:
+            W = np.array(self.map.logistic_map(self.mu, .01, 4))
+        else:
+            W = rand(self.mu)
+        
+#        W = W/np.max(W)
 #        W = (np.array(range(self.mu))+1)/float(self.mu+2)
 #        W = np.ones(self.mu)*self.w
+        
+#        X = self.map.logistic_map(self.lchrom*self.mu, .01, 4)
+        
         for i in range(self.mu):
-            chrom = rand(self.lchrom)*(self.ub-self.lb) - self.lb
+            if self.chaos_init==True:    
+                chrom = np.array(self.map.logistic_map(self.lchrom, rand()/10., rand()*.5+3.5))
+#                chrom = X[i*self.lchrom:(i+1)*self.lchrom]
+                chrom = chrom*(self.ub-self.lb) + self.lb
+            else:
             
+                chrom = rand(self.lchrom)*(self.ub-self.lb) + self.lb
+    
             ind = Individual()
             ind.chrom = chrom
             ind.w = W[i]
@@ -186,13 +211,14 @@ class Problem():
 
     def find_best_current(self):
         pop = [ind for ind in self.pop.np]
-        pop.sort(key=lambda x:x.fitness, reverse=True)
+        pop.sort(key=lambda x:x.fitness, reverse=False)
         self.g_star = deepcopy(pop[0])
 #        print 'here'
 #        print self.g_star.fitness
         
 
     def generate(self):
+        self.max = np.average(np.array([ind.chrom for ind in self.pop.np]), axis=0)
         for ind in self.pop.np:
 #            print prob.pop.np[0].chrom
             if self.flip(self.pSwitch):
@@ -205,6 +231,7 @@ class Problem():
         ind2 = deepcopy(ind)
         
         L = self.levy()
+        self.L.append(L)
 
         ind2.chrom += self.step * L * (self.g_star.chrom - ind2.chrom)
         
@@ -227,11 +254,18 @@ class Problem():
         
     
     def local_search(self, ind):
-        eps = rand()
+
+#        eps = c.logistic_map(self.max_gen, .01, 1)[self.pop.gen]
+        ind2 = deepcopy(ind)
         
+        if self.chaos_local==True:
+#            dif = self.chaotic_seq[self.pop.gen-1] * self.max
+#            ind2.chrom += eps * dif
+            eps = self.chaotic_seq[(self.pop.gen-1)*self.mu + randint(0, self.mu)]
+        else:
+            eps = rand()
         chrom1 = self.pop.np[int(rand()*self.mu)].chrom
         chrom2 = self.pop.np[int(rand()*self.mu)].chrom
-        ind2 = deepcopy(ind)
         
         ind2.chrom += eps * (chrom1-chrom2)
         
@@ -270,6 +304,8 @@ class Problem():
             V = normal(0, 1)
         
             s.append(U / abs(V)**(1/self.beta))
+            
+#        s = self.map.logistic_map(self.lchrom, rand()/10., rand()*4)
         return np.array(s)
             
           
@@ -338,18 +374,20 @@ if __name__=='__main__':
     best_fitness = 10
     cnt = 0
 
-    pop = []    
+    pop = []
+    F = []
     
-    while best_fitness>1e-15:
+    for i in [True, False]:
 #    for i in range(1):
 #        print i
         seed = int(random.random()*999)
-
-#        np.random.seed(seed)
+        seed = 200
+        np.random.seed(seed)
         dim = 30
-        prob = Problem(dimension=dim, lb=[0]*dim, ub=[1]*dim, max_gen=10000,
-                       mu=300, landa=35, beta=1.5, step=.1, prob_type='LZ',
-                       pSwitch=.8, w=rand())
+        prob = Problem(dimension=dim, lb=[-30]*dim, ub=[30]*dim, max_gen=3000,
+                       mu=50, landa=35, beta=1.5, step=.1, prob_type='ackley',
+                       pSwitch=.8, chaos_init=i, chaos_local=i)
+        print i
         prob.initialize()
 #        print prob.pop.np[0].chrom
 #        prob.pop.np = prob.pop.op
@@ -357,6 +395,8 @@ if __name__=='__main__':
         
         prob.gen_statistics()    
         prob.report()
+        
+        F.append(prob.best_fitness)
 
 #        print prob.pop.np[0].chrom
 #        print prob.pop.np[0].fitness
@@ -367,6 +407,7 @@ if __name__=='__main__':
             prob.generate()
             prob.gen_statistics()
             prob.find_best_current()
+            F.append(prob.best_fitness)
             
             if prob.pop.gen%100==0:
                 prob.report()
@@ -387,7 +428,12 @@ if __name__=='__main__':
     	
         pop.extend([ind for ind in prob.pop.np])
 #        prob.pareto()
-        break
+#        break
+
+    x = range(len(F)/2)        
+    plt.plot(x, np.log(F[:len(F)/2]), 'g', x, np.log(F[len(F)/2:]), 'r')
+    plt.show()
+
     
     prob.pop.np = [ind for ind in pop]
-    prob.pareto()
+#    prob.pareto()
