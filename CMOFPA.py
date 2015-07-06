@@ -81,13 +81,35 @@ class Problem():
 #        self.w = w
         self.max = np.array([])
 #        self.chaotic_seq = self.map.logistic_map(self.max_gen*self.mu, .01, 3.6)
-        self.chaotic_seq = self.map.logistic_map(self.max_gen*self.mu, .01, 3.6)
+#        self.chaotic_seq = self.map.logistic_map(self.max_gen*self.mu, .01, 3.6)
+#        self.chaotic_seq = self.map.tent_map(self.max_gen*self.mu, rand(), .7)
+        self.chaotic_seq = self.map.gauss_map(self.max_gen*self.mu, rand())
+        
+#        self.chaotic_local
         
         self.L = []
+
+    
+    def chaotic_chrom(self, p):
+        x = rand()
+        p = np.array(p)
+        p = p/float(np.sum(p))
+        if x<=p[0]:
+            chrom = np.array(self.map.logistic_map(self.lchrom, rand()/20., rand()*.5+3.5))
+        elif x<=np.sum(p[:2]):
+            chrom = np.array(self.map.gauss_map(self.lchrom, rand()))
+        elif x<=np.sum(p[:3]):
+            chrom = np.array(self.map.tent_map(self.lchrom, rand(), .7))
+        elif x<=np.sum(p[:4]):
+            chrom = np.array(self.map.sin_map(self.lchrom, rand()))
+        return chrom
     
     def initialize(self):
         if self.chaos_init:
-            W = np.array(self.map.logistic_map(self.mu, .01, 4))
+#            W = np.array(self.map.logistic_map(self.mu, rand()/10., rand()*.5+3.5))
+#            W = np.array(self.map.tent_map(self.mu, rand(), .7))
+            W = np.array(self.map.gauss_map(self.mu, rand()))
+#            W = np.array(self.map.sin_map(self.mu, rand()))
         else:
             W = rand(self.mu)
         
@@ -98,12 +120,16 @@ class Problem():
 #        X = self.map.logistic_map(self.lchrom*self.mu, .01, 4)
         
         for i in range(self.mu):
-            if self.chaos_init==True:    
-                chrom = np.array(self.map.logistic_map(self.lchrom, rand()/10., rand()*.5+3.5))
-#                chrom = X[i*self.lchrom:(i+1)*self.lchrom]
+            if self.chaos_init==True:
+#                if self.flip(0):
+#                    chrom = np.array(self.map.logistic_map(self.lchrom, rand()/20., rand()*.5+3.5))
+#                elif self.flip(0):
+#                    chrom = np.array(self.map.gauss_map(self.lchrom, rand()))
+#                else:
+#                    chrom = np.array(self.map.tent_map(self.lchrom, rand(), .7))
+                chrom = self.chaotic_chrom([3,5,60,5])
                 chrom = chrom*(self.ub-self.lb) + self.lb
             else:
-            
                 chrom = rand(self.lchrom)*(self.ub-self.lb) + self.lb
     
             ind = Individual()
@@ -111,9 +137,15 @@ class Problem():
             ind.w = W[i]
             ind.fitness = self.evaluation(ind)
             self.pop.np.append(ind)
-#            print self.pop.np[len(self.pop.np)-1].chrom
-#            print self.pop.np[len(self.pop.np)-1].fitness
-                
+            
+#            if i<>0:
+#                ind.j = self.pop.np[i-1].chrom
+#                self.pop.np[i-1].k = ind.chrom
+#            if i==self.mu-1:
+#                ind.k = self.pop.np[0].chrom
+#                self.pop.np[0].j = ind.chrom
+#                
+            
                 
     def evaluation(self, ind):
         chrom = ind.chrom
@@ -207,7 +239,61 @@ class Problem():
         plt.show()
 #        plt.scatter(y, x, marker='x')
 
+
+    def pareto_error(self):
+        X = []
+        Y = []
         
+        if self.prob_type[:-1]=='ZDT':
+            for ind in self.pop.np:
+                chrom = ind.chrom
+                g = 1 + (9*np.sum(chrom[1:]) / float(len(chrom[1:])))
+#                g = 1
+                f1 = chrom[0]
+                
+                if self.prob_type[-1]=='1':
+                    f2 = g * (1 - sqrt(f1/g))
+                elif self.prob_type[-1]=='2':
+                    f2 = g * (1 - (f1/g))**2
+                elif self.prob_type[-1]=='3':
+                    f2 = g * (1 - sqrt(f1/g) - (f1/g)*sin(10*pi*f1))        
+
+                X.append(f1)
+                Y.append(f2)
+                    
+                    
+#            x = [i/31. for i in range(30)]
+            x = X
+            if self.prob_type[-1]=='1':
+                y = [1-sqrt(i) for i in x]
+            elif self.prob_type[-1]=='2':
+                y = [(1-i)**2 for i in x]
+            elif self.prob_type[-1]=='3':
+                y = [(1-sqrt(i)-i*sin(10*pi*i))**2 for i in x]
+
+        elif self.prob_type=='LZ':
+            for ind in self.pop.np:
+                chrom = ind.chrom
+                
+                x1 = chrom[0]
+                J1 = chrom[1::2]
+                J2 = chrom[2::2]
+                
+                t = np.array([sin(6*pi*x1 + j*pi/self.lchrom) for j in range(self.lchrom)])
+                t1 = t[1::2]
+                t2 = t[3::2]
+                
+                f1 = x1 + 2/float(len(J1)) * np.sum((J1-t1)**2)
+                f2 = 1 - sqrt(x1) + 2/float(len(J2)) * np.sum((J2-t2)**2)
+                
+                X.append(f1)
+                Y.append(f2)
+        
+#        plt.scatter(y, x, marker='*')
+#        plt.scatter(Y, X, marker='x', cmap='r')
+#        plt.show()
+#        plt.scatter(y, x, marker='x')
+        return np.sum((np.array(Y)-np.array(y))**2)/float(self.lchrom)
 
     def find_best_current(self):
         pop = [ind for ind in self.pop.np]
@@ -219,12 +305,20 @@ class Problem():
 
     def generate(self):
         self.max = np.average(np.array([ind.chrom for ind in self.pop.np]), axis=0)
+        i = 0
+#        idx = self.map.tent_map(self.mu*2, rand(), .7)
+#        idx = self.map.gauss_map(self.mu*2, rand())
+        idx = self.map.sin_map(self.mu*2, rand())
+        idx = self.map.logistic_map(self.mu*2, rand(), 3.8)
         for ind in self.pop.np:
+            
 #            print prob.pop.np[0].chrom
             if self.flip(self.pSwitch):
                 self.global_search(ind)
             else:
-                self.local_search(ind)
+                self.local_search(ind, idx[2*i:2*i+2])
+                
+            i += 1
             
       
     def global_search(self, ind):
@@ -253,19 +347,19 @@ class Problem():
             ind.chrom = ind2.chrom
         
     
-    def local_search(self, ind):
+    def local_search(self, ind, idx):
 
-#        eps = c.logistic_map(self.max_gen, .01, 1)[self.pop.gen]
         ind2 = deepcopy(ind)
         
         if self.chaos_local==True:
-#            dif = self.chaotic_seq[self.pop.gen-1] * self.max
-#            ind2.chrom += eps * dif
-            eps = self.chaotic_seq[(self.pop.gen-1)*self.mu + randint(0, self.mu)]
+#            eps = self.chaotic_seq[(self.pop.gen-1)*self.mu + randint(0, self.mu)]
+            eps = rand()
+            chrom1 = self.pop.np[int(idx[0]*self.mu)].chrom
+            chrom2 = self.pop.np[int(idx[1]*self.mu)].chrom
         else:
             eps = rand()
-        chrom1 = self.pop.np[int(rand()*self.mu)].chrom
-        chrom2 = self.pop.np[int(rand()*self.mu)].chrom
+            chrom1 = self.pop.np[int(rand()*self.mu)].chrom
+            chrom2 = self.pop.np[int(rand()*self.mu)].chrom
         
         ind2.chrom += eps * (chrom1-chrom2)
         
@@ -361,6 +455,13 @@ class Problem():
             return True
         else:
             return False
+            
+            
+def condition(param):
+    if param[-1]<param[len(param)/2 - 1]:
+        return True
+    else:
+        return False
                 
                 
 if __name__=='__main__':
@@ -375,65 +476,97 @@ if __name__=='__main__':
     cnt = 0
 
     pop = []
-    F = []
+    F = [100, 50]
     
-    for i in [True, False]:
-#    for i in range(1):
-#        print i
+    err = [10, 50]
+    
+    while condition(F):
+        F = []
+        err = []
+
         seed = int(random.random()*999)
-        seed = 200
-        np.random.seed(seed)
-        dim = 30
-        prob = Problem(dimension=dim, lb=[-30]*dim, ub=[30]*dim, max_gen=3000,
-                       mu=50, landa=35, beta=1.5, step=.1, prob_type='ackley',
-                       pSwitch=.8, chaos_init=i, chaos_local=i)
-        print i
-        prob.initialize()
-#        print prob.pop.np[0].chrom
-#        prob.pop.np = prob.pop.op
-        prob.find_best_current()
         
-        prob.gen_statistics()    
-        prob.report()
-        
-        F.append(prob.best_fitness)
-
-#        print prob.pop.np[0].chrom
-#        print prob.pop.np[0].fitness
-        
-        while prob.pop.gen<prob.max_gen:
-            prob.pop.gen += 1
+        for i in [True, False]:
+    #    for i in range(1):
+    #        print i
             
-            prob.generate()
-            prob.gen_statistics()
+#            seed = 143
+            np.random.seed(seed)
+            dim = 100
+            prob = Problem(dimension=dim, lb=[-30]*dim, ub=[30]*dim, max_gen=1000,
+                           mu=40, beta=1.5, step=.1, prob_type='ackley',
+                           pSwitch=.8, chaos_init=False, chaos_local=i)
+            '''
+            ZDT1 : 100 , 40
+            '''
+            print i
+            prob.initialize()
+    #        print prob.pop.np[0].chrom
+    #        prob.pop.np = prob.pop.op
             prob.find_best_current()
-            F.append(prob.best_fitness)
             
-            if prob.pop.gen%100==0:
-                prob.report()
-            prob.pop.op = prob.pop.np
-    #        print '-----------------------------'
-        f.close()
+            prob.gen_statistics()    
+            prob.report()
+            
+            F.append(prob.best_fitness)
+    
+            while prob.pop.gen<prob.max_gen:# and prob.best_fitness>1e-12:
+                prob.pop.gen += 1
+                
+                prob.generate()
+                prob.gen_statistics()
+                prob.find_best_current()
+                F.append(prob.best_fitness)
+                
+                if prob.pop.gen%100==0:
+                    prob.report()
+                prob.pop.op = prob.pop.np
+                
+                if prob.prob_type<>'ackley':
+                    err.append(prob.pareto_error())
+                
+        #        print '-----------------------------'
+            f.close()
+            
+    #        print 'solution :'
+    #        for c in prob.best_chrom:
+    #            print '%.15f  '%c,
+    #        print 'fitness :  ', prob.best_fitness
+    #        print 'seed :   ', seed
+        #    print '-----------------------------\n'
+            
+            prob.final_report(seed)
+                        
+            best_fitness = prob.best_fitness
+        	
+            pop.extend([ind for ind in prob.pop.np])
+    #        prob.pareto()
+    #        break
+            if prob.prob_type<>'ackley':
+                err.append(prob.pareto_error())
+    #        prob.pareto()
+            
         
-#        print 'solution :'
-#        for c in prob.best_chrom:
-#            print '%.15f  '%c,
-#        print 'fitness :  ', prob.best_fitness
-#        print 'seed :   ', seed
-    #    print '-----------------------------\n'
-        
-        prob.final_report(seed)
-                    
-        best_fitness = prob.best_fitness
-    	
-        pop.extend([ind for ind in prob.pop.np])
-#        prob.pareto()
-#        break
-
-    x = range(len(F)/2)        
+    '''
+    fitness diagram
+    '''
+    x = range(len(F)/2)
     plt.plot(x, np.log(F[:len(F)/2]), 'g', x, np.log(F[len(F)/2:]), 'r')
     plt.show()
 
     
+    '''
+    error diagram
+    '''
+#    X = range(len(err)/2)
+#    plt.plot(X, np.log(err[:len(err)/2]), 'r', X, np.log(err[len(err)/2:]), 'g')
+#    plt.show()
+    
+#    X = range(len(err))
+#    plt.plot(X, np.log(err[:len(err)]))
+#    plt.show()    
+    
     prob.pop.np = [ind for ind in pop]
+    
+    
 #    prob.pareto()
